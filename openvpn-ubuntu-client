@@ -28,6 +28,9 @@ echo ""
 echo "local user name:"
 read LOCALUSERNAME
 
+echo "vpn id:"
+read VPNID
+
 OPENVPNSERVERDIR="/etc/pki/tls/private/$OPENVPNSERVER"
 mkdir -p $OPENVPNSERVERDIR && chmod -R 700 $OPENVPNSERVERDIR
 
@@ -36,9 +39,9 @@ tee $OPENVPNSERVERDIR/openvpn-client.conf > /dev/null << EOM
 client
 tls-client
 tls-auth $OPENVPNSERVERDIR/ta.key 1
-ca $OPENVPNSERVERDIR/ca.crt
-cert $OPENVPNSERVERDIR/client1.crt
-key $OPENVPNSERVERDIR/client1.key
+ca $OPENVPNSERVERDIR/$OPENVPNSERVER.ca-crt
+cert $OPENVPNSERVERDIR/$OPENVPNSERVER.client$VPNID-crt
+key $OPENVPNSERVERDIR/$OPENVPNSERVER.client$VPNID-key
 proto tcp
 remote $OPENVPNSERVER 1194 tcp
 cipher AES-256-CBC
