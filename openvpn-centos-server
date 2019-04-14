@@ -1,5 +1,5 @@
 #!/bin/bash
-# installs openvpn, configures firewalld, creates certificates, and places client certificates in ~/client1/
+# installs openvpn, configures firewalld, creates certificates, and places client certificates
 if [ $(id -u) -ne 0 ];
 then
 	echo "must be run as root (sudo), exiting."
@@ -127,8 +127,8 @@ systemctl restart openvpn@server.service
 # export to client(s)
 CLIENTDIR="/etc/pki/tls/private/openvpn/client$CLIENTID"
 mkdir -p $CLIENTDIR
-cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key $CLIENTDIR/
-cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt $CLIENTDIR/
+mv /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key $CLIENTDIR/
+mv /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt $CLIENTDIR/
 cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt $CLIENTDIR/
 cp /etc/pki/tls/private/openvpn/ta.key $CLIENTDIR/
 
