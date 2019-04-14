@@ -1,0 +1,139 @@
+#!/bin/bash
+# installs openvpn, configures firewalld, creates certificates, and places client certificates in ~/client1/
+if [ $(id -u) -ne 0 ];
+then
+	echo "must be run as root (sudo), exiting."
+	exit
+fi
+
+# required executables
+for REQEXEC in yum firewall-cmd systemctl mkdir openssl chmod tee mkdir cp chown;
+do
+	which $REQEXEC > /dev/null
+	if [ $? -ne 0 ];
+	then
+		echo "required executable $REQEXEC not found, exiting"
+		exit
+	fi
+done
+
+# install
+yum -y install openvpn
+
+# allow masq
+firewall-cmd --add-masquerade --permanent
+firewall-cmd --add-port=1194/udp --permanent
+firewall-cmd --reload
+
+# forwarding
+defaultinterface=$(ip route get 8.8.8.8 | awk 'NR==1 {print $(NF-2)}')
+firewall-cmd --permanent --direct --passthrough ipv4 -t nat -A POSTROUTING -s 10.8.0.0/24 -o $defaultinterface -j MASQUERADE
+
+# stop openvpn
+systemctl stop openvpn@server.service
+
+# certificate directory
+mkdir -p /etc/pki/tls/private/openvpn && sudo chmod 700 /etc/pki/tls/private/openvpn
+
+# tls key gen and exchange (SLOW!)
+if [ ! -f /etc/pki/tls/private/openvpn/ta.key ];
+then
+	openvpn --genkey --secret /etc/pki/tls/private/openvpn/ta.key
+fi
+
+if [ ! -f /etc/pki/tls/private/openvpn/dh2048.pem ];
+then
+	openssl dhparam -out /etc/pki/tls/private/openvpn/dh2048.pem 2048
+fi
+
+# server name
+OPENVPNSERVER=$(hostname -f)
+
+# ca key gen
+if [ ! -f /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-key ];
+then
+	openssl req -x509 -newkey rsa:2048 -sha256 -nodes \
+	-keyout /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-key \
+	-out /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt \
+	-subj "/O=$(hostname -s)/emailAddress=vpn@vpn/CN=ca$OPENVPNSERVER"
+fi
+
+# server key csr and ca-signed gen
+if [ ! -f /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-key ];
+then
+	openssl req -new -newkey rsa:2048 -sha256 -nodes \
+	-keyout /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-key \
+	-out /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-csr \
+	-subj "/O=$(hostname -s)/emailAddress=vpn@vpn/CN=$OPENVPNSERVER"
+
+	openssl x509 -req -days 1095 -sha256 -CAcreateserial \
+	-in /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-csr \
+	-CA /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt \
+	-CAkey /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-key \
+	-out /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-crt
+fi
+
+# client key gen
+echo 'client id (e.g. some number or name to identify)?'
+read CLIENTID
+openssl req -new -newkey rsa:2048 -sha256 -nodes \
+-keyout /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key \
+-out /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-csr \
+-subj "/O=$(hostname -s)/emailAddress=vpnuser@vpn/CN=$CLIENTID"
+
+# client ca-signed crt
+openssl x509 -req -days 1095 -sha256 -set_serial 01 -CAcreateserial \
+-in /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-csr \
+-CA /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt \
+-CAkey /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-key \
+-out /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt
+
+# set permissions
+chmod -R 700 /etc/pki/tls/private/openvpn/
+
+# openvpn conf
+tee /etc/openvpn/server.conf > /dev/null << EOM
+port 1194
+proto udp
+dev tun
+tls-server
+key-direction 0
+ca /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt
+cert /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-crt
+key /etc/pki/tls/private/openvpn/$OPENVPNSERVER.server-key
+dh /etc/pki/tls/private/openvpn/dh2048.pem
+tls-auth /etc/pki/tls/private/openvpn/ta.key 0
+topology subnet
+server 10.8.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 208.67.222.222"
+push "dhcp-option DNS 208.67.220.220"
+keepalive 10 120
+cipher AES-256-CBC
+user nobody
+group nobody
+persist-key
+persist-tun
+status openvpn-status.log
+log /var/log/openvpn.log
+log-append /var/log/openvpn.log
+verb 3
+EOM
+
+# (re)start service
+systemctl restart openvpn@server.service
+
+# export to client(s)
+mkdir ~/client$CLIENTID
+cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key ~/client1/client$CLIENTID.key
+cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt ~/client1/client$CLIENTID.crt
+cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt ~/client$CLIENTID/ca.crt
+cp /etc/pki/tls/private/openvpn/ta.key ~/client$CLIENTID/ta.key
+
+# permission
+chown -R $USER ~/client$CLIENTID/
+
+# instructions
+echo "
+Place files in ~/client$CLIENTID into the client's directory."

@@ -1,0 +1,64 @@
+#!/bin/bash
+# installs openvpn, configures firewalld, creates certificates, and places client certificates in ~/client1/
+if [ $(id -u) -ne 0 ];
+then
+	echo "must be run as root (sudo), exiting."
+	exit
+fi
+
+# required executables
+for REQEXEC in apt echo mkdir scp chmod tee;
+do
+	which $REQEXEC > /dev/null
+	if [ $? -ne 0 ];
+	then
+		echo "required executable $REQEXEC not found, exiting"
+		exit
+	fi
+done
+
+# install
+apt-get -q install openvpn-systemd-resolved openvpn
+
+echo "
+openvpn server hostname:"
+read OPENVPNSERVER
+echo ""
+
+echo "local user name:"
+read LOCALUSERNAME
+
+OPENVPNSERVERDIR="/etc/pki/tls/private/$OPENVPNSERVER/"
+mkdir -p $OPENVPNSERVERDIR && chmod -R 700 $OPENVPNSERVERDIR
+
+# client conf
+tee $OPENVPNSERVERDIR/openvpn-client.conf > /dev/null << EOM
+client
+tls-client
+tls-auth $OPENVPNSERVERDIR/ta.key 1
+ca $OPENVPNSERVERDIR/ca.crt
+cert $OPENVPNSERVERDIR/client1.crt
+key $OPENVPNSERVERDIR/client1.key
+proto tcp
+remote $OPENVPNSERVER 1194 tcp
+cipher AES-256-CBC
+dev tun
+topology subnet
+pull
+user $LOCALUSERNAME
+group $LOCALUSERNAME
+persist-tun
+persist-key
+;UBUNTU18.04ONLY
+script-security 2
+up /etc/openvpn/update-systemd-resolved
+down /etc/openvpn/update-systemd-resolved
+down-pre
+;ENDUBUNTU18.04ONLY
+EOM
+
+# instructions
+echo "
+Place ta.key ca.crt client1.crt and client1.key from $OPENVPNSERVER in $OPENVPNSERVERDIR"
+echo "
+To start openvpn client, run: sudo openvpn --config ""$OPENVPNSERVERDIR""openvpn-client.conf" 
