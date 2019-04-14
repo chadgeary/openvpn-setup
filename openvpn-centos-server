@@ -125,15 +125,13 @@ EOM
 systemctl restart openvpn@server.service
 
 # export to client(s)
-mkdir -p ~/client$CLIENTID
-cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key ~/client1/client$CLIENTID.key
-cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt ~/client1/client$CLIENTID.crt
-cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt ~/client$CLIENTID/ca.crt
-cp /etc/pki/tls/private/openvpn/ta.key ~/client$CLIENTID/ta.key
-
-# permission
-chown -R $USER ~/client$CLIENTID/
+CLIENTDIR="/etc/pki/tls/private/openvpn/client$CLIENTID"
+mkdir -p $CLIENTDIR
+cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key $CLIENTDIR/
+cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt $CLIENTDIR/
+cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt $CLIENTDIR/
+cp /etc/pki/tls/private/openvpn/ta.key $CLIENTDIR/
 
 # instructions
 echo "
-Place files in ~/client$CLIENTID into the client's directory."
+Provide files in $CLIENTDIR to the client machine's directory."
