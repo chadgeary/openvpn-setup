@@ -28,7 +28,7 @@ echo ""
 echo "local user name:"
 read LOCALUSERNAME
 
-OPENVPNSERVERDIR="/etc/pki/tls/private/$OPENVPNSERVER/"
+OPENVPNSERVERDIR="/etc/pki/tls/private/$OPENVPNSERVER"
 mkdir -p $OPENVPNSERVERDIR && chmod -R 700 $OPENVPNSERVERDIR
 
 # client conf
@@ -61,4 +61,4 @@ EOM
 echo "
 Place ta.key ca.crt client1.crt and client1.key from $OPENVPNSERVER in $OPENVPNSERVERDIR"
 echo "
-To start openvpn client, run: sudo openvpn --config ""$OPENVPNSERVERDIR""openvpn-client.conf" 
+To start openvpn client, run: sudo openvpn --config ""$OPENVPNSERVERDIR""/openvpn-client.conf" 
