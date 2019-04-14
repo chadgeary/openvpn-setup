@@ -42,8 +42,8 @@ tls-auth $OPENVPNSERVERDIR/ta.key 1
 ca $OPENVPNSERVERDIR/$OPENVPNSERVER.ca-crt
 cert $OPENVPNSERVERDIR/$OPENVPNSERVER.client$VPNID-crt
 key $OPENVPNSERVERDIR/$OPENVPNSERVER.client$VPNID-key
-proto tcp
-remote $OPENVPNSERVER 1194 tcp
+proto udp
+remote $OPENVPNSERVER 1194 udp
 cipher AES-256-CBC
 dev tun
 topology subnet
