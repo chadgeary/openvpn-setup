@@ -125,7 +125,7 @@ EOM
 systemctl restart openvpn@server.service
 
 # export to client(s)
-mkdir ~/client$CLIENTID
+mkdir -p ~/client$CLIENTID
 cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-key ~/client1/client$CLIENTID.key
 cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.client$CLIENTID-crt ~/client1/client$CLIENTID.crt
 cp /etc/pki/tls/private/openvpn/$OPENVPNSERVER.ca-crt ~/client$CLIENTID/ca.crt
